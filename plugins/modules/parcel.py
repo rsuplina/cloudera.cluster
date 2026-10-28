@@ -188,10 +188,15 @@ RETURN = r"""
 parcels:
     description:
         - Details about each parcel, in the order given in O(parcels).
-        - A single parcel given with O(name) and O(parcel_version) is returned as a list with one item.
+        - Each item has the same fields as RV(parcel).
     type: list
     elements: dict
-    returned: always
+    returned: when O(parcels) is set
+parcel:
+    description:
+        - Details about the parcel given with O(name) and O(parcel_version).
+    type: dict
+    returned: when O(parcels) is not set
     contains:
         product:
             description: The name of the product.
@@ -295,7 +300,7 @@ class ClouderaParcel(ClouderaManagerModule):
         # Set outputs
         self.changed = False
         self.diff = {}
-        self.output = []
+        self.output = {} if self.parcels is None else []
 
         # Execute
         self.process()
@@ -396,7 +401,7 @@ class ClouderaParcel(ClouderaManagerModule):
             self.diff = dict(before=parcel.stage, after=self.state)
 
         try:
-            self.output.append(self._apply(parcel_api, parcel))
+            self.output = self._apply(parcel_api, parcel)
         except ParcelException as ex:
             self.module.fail_json(msg=str(ex))
 
@@ -496,7 +501,12 @@ def main():
 
     result = ClouderaParcel(module)
 
-    output = dict(changed=result.changed, parcels=result.output)
+    output = dict(changed=result.changed)
+
+    if result.parcels is None:
+        output.update(parcel=result.output)
+    else:
+        output.update(parcels=result.output)
 
     if module._diff:
         output.update(diff=result.diff)
